@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChiriJson</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="top-bar">
+        <div>
+          <p class="status" id="status">Conectando...</p>
+        </div>
+        <div class="header-actions">
+          <button
+            class="theme-toggle"
+            id="theme-toggle"
+            aria-label="Cambiar tema"
+          >
+            <span class="theme-icon" aria-hidden="true">◐</span>
+          </button>
+          <div class="user-info">
+            <span class="label">Tu nombre</span>
+            <strong id="current-user">Invitado</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="chat-panel">
+          <div class="panel-title">Chat Chisme</div>
+          <div class="messages" id="messages"></div>
+
+          <form class="chat-form" id="chat-form">
+            <input
+              type="text"
+              id="input-message"
+              placeholder="Escribe un mensaje..."
+              autocomplete="off"
+            />
+            <button
+              class="emoji-btn"
+              id="emoji-btn"
+              type="button"
+              aria-label="Enviar emoji"
+            >
+              Emoji
+            </button>
+            <button type="submit">
+              <span aria-hidden="true"></span>
+              Enviar
+            </button>
+          </form>
+        </section>
+
+        <aside class="side-panel">
+          <div class="panel-title">Usuarios activos</div>
+          <ul class="user-list" id="users"></ul>
+
+          <div class="profile-card">
+            <button class="toggle-btn" id="toggle-name" aria-expanded="false">
+              <span class="toggle-label">Cambiar nombre</span>
+              <span class="toggle-icon">▼</span>
+            </button>
+            <form class="name-form collapsed" id="name-form">
+              <input
+                type="text"
+                id="input-name"
+                placeholder="Nuevo nombre"
+                autocomplete="off"
+              />
+              <button type="submit" class="secondary">Guardar</button>
+            </form>
+          </div>
+
+          <div class="connection-card">
+            <button
+              class="toggle-btn"
+              id="toggle-connection"
+              aria-expanded="false"
+            >
+              <span class="toggle-label">Conexión</span>
+              <span class="toggle-icon">▼</span>
+            </button>
+            <div class="connection-actions collapsed" id="connection-actions">
+              <button class="secondary" id="btn-disconnect">Desconectar</button>
+              <button class="secondary" id="btn-connect">Conectar</button>
+            </div>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script>
+      const statusEl = document.querySelector("#status");
+      const currentUserEl = document.querySelector("#current-user");
+      const usersListEl = document.querySelector("#users");
+      const nameForm = document.querySelector("#name-form");
+      const nameInput = document.querySelector("#input-name");
+      const messagesEl = document.querySelector("#messages");
+      const chatForm = document.querySelector("#chat-form");
+      const messageInput = document.querySelector("#input-message");
+      const emojiBtn = document.querySelector("#emoji-btn");
+      const btnDisconnect = document.querySelector("#btn-disconnect");
+      const btnConnect = document.querySelector("#btn-connect");
+
+      const storedName = localStorage.getItem("chatUserName");
+      let userName =
+        storedName ||
+        prompt(
+          "Ingresa tu nombre para el chat",
+          `Invitado${Math.floor(Math.random() * 1000)}`,
+        ) ||
+        "Invitado";
+      localStorage.setItem("chatUserName", userName);
+      currentUserEl.textContent = userName;
+      nameInput.value = userName;
+
+      let socket;
+      const userColors = {};
+      const colorPalette = [
+        "rgba(14, 165, 233, 0.12)",
+        "rgba(236, 72, 153, 0.12)",
+        "rgba(34, 197, 94, 0.12)",
+        "rgba(168, 85, 247, 0.12)",
+        "rgba(249, 115, 22, 0.12)",
+        "rgba(59, 130, 246, 0.12)",
+        "rgba(14, 200, 188, 0.12)",
+        "rgba(219, 39, 119, 0.12)",
+      ];
+
+      const getColorForUser = (name) => {
+        if (!userColors[name]) {
+          userColors[name] =
+            colorPalette[Object.keys(userColors).length % colorPalette.length];
+        }
+        return userColors[name];
+      };
+
+      const getWebSocketUrl = () => {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        return `${protocol}//${window.location.host}`;
+      };
+
+      const updateStatus = (text, isError = false) => {
+        statusEl.textContent = text;
+        statusEl.classList.toggle("status-error", isError);
+      };
+
+      const addMessage = (message, options = {}) => {
+        const messageItem = document.createElement("div");
+        messageItem.className = `message ${options.system ? "system" : ""}`;
+
+        const userColor = options.system
+          ? "transparent"
+          : getColorForUser(message.name);
+        messageItem.style.background = userColor;
+
+        messageItem.innerHTML = `
+          <div class="message-header">
+            <span class="message-author">${options.system ? "Sistema" : message.name}</span>
+            <span class="message-time">${new Date(message.timestamp).toLocaleTimeString()}</span>
+          </div>
+          <div class="message-body">${message.text}</div>
+        `;
+
+        messagesEl.appendChild(messageItem);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      };
+
+      const setUserList = (users) => {
+        usersListEl.innerHTML = users
+          .map((name) => `<li>${name}</li>`)
+          .join("");
+      };
+
+      const connectSocket = () => {
+        socket = new WebSocket(getWebSocketUrl());
+
+        socket.onopen = () => {
+          updateStatus("En línea");
+          socket.send(
+            JSON.stringify({ type: "JOIN_CHAT", payload: { name: userName } }),
+          );
+          messageInput.disabled = false;
+          messageInput.focus();
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+
+            if (data.type === "CHAT_MESSAGE") {
+              addMessage(data.payload, {
+                system: data.payload.name === "Sistema",
+              });
+            }
+
+            if (data.type === "USER_LIST") {
+              setUserList(data.payload);
+            }
+
+            if (data.type === "ERROR") {
+              addMessage(
+                {
+                  name: "Sistema",
+                  text: data.payload.error,
+                  timestamp: Date.now(),
+                },
+                { system: true },
+              );
+            }
+          } catch (error) {
+            console.error("Error parsing message", error);
+          }
+        };
+
+        socket.onclose = () => {
+          updateStatus("Desconectado", true);
+          messageInput.disabled = true;
+        };
+
+        socket.onerror = () => {
+          updateStatus("Error en conexión", true);
+        };
+      };
+
+      chatForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const text = messageInput.value.trim();
+        if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
+
+        socket.send(
+          JSON.stringify({ type: "CHAT_MESSAGE", payload: { text } }),
+        );
+        messageInput.value = "";
+      });
+
+      emojiBtn.addEventListener("click", () => {
+        const emojis = [
+          "😊",
+          "👍",
+          "❤️",
+          "🎉",
+          "😂",
+          "🔥",
+          "✨",
+          "👏",
+          "🚀",
+          "😎",
+        ];
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+        messageInput.value += randomEmoji;
+        messageInput.focus();
+      });
+
+      nameForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const newName = nameInput.value.trim();
+        if (
+          !newName ||
+          newName === userName ||
+          !socket ||
+          socket.readyState !== WebSocket.OPEN
+        )
+          return;
+
+        userName = newName;
+        localStorage.setItem("chatUserName", userName);
+        currentUserEl.textContent = userName;
+        socket.send(
+          JSON.stringify({ type: "JOIN_CHAT", payload: { name: userName } }),
+        );
+      });
+
+      btnDisconnect.addEventListener("click", () => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        }
+      });
+
+      btnConnect.addEventListener("click", () => {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          connectSocket();
+        }
+      });
+
+      // Toggle name form
+      const toggleNameBtn = document.querySelector("#toggle-name");
+
+      toggleNameBtn.addEventListener("click", () => {
+        const isExpanded =
+          toggleNameBtn.getAttribute("aria-expanded") === "true";
+        toggleNameBtn.setAttribute("aria-expanded", !isExpanded);
+        nameForm.classList.toggle("collapsed");
+      });
+
+      // Toggle connection actions
+      const toggleConnectionBtn = document.querySelector("#toggle-connection");
+      const connectionActions = document.querySelector("#connection-actions");
+
+      toggleConnectionBtn.addEventListener("click", () => {
+        const isExpanded =
+          toggleConnectionBtn.getAttribute("aria-expanded") === "true";
+        toggleConnectionBtn.setAttribute("aria-expanded", !isExpanded);
+        connectionActions.classList.toggle("collapsed");
+      });
+
+      // Theme toggle
+      const themeToggle = document.querySelector("#theme-toggle");
+      const savedTheme = localStorage.getItem("chatTheme") || "dark";
+      document.documentElement.dataset.theme = savedTheme;
+
+      themeToggle.addEventListener("click", () => {
+        const currentTheme = document.documentElement.dataset.theme;
+        const newTheme = currentTheme === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = newTheme;
+        localStorage.setItem("chatTheme", newTheme);
+      });
+
+      connectSocket();
+    </script>
+  </body>
+</html>

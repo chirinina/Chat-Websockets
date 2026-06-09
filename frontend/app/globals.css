@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-app: var(--bg-app);
+  --color-bg-sidebar: var(--bg-sidebar);
+  --color-bg-card: var(--bg-card);
+  --color-border-main: var(--border-main);
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-light: var(--accent-light);
+  --color-bubble-own: var(--bubble-own);
+  --color-bubble-own-text: var(--bubble-own-text);
+  --color-bubble-other: var(--bubble-other);
+  --color-bubble-other-text: var(--bubble-other-text);
+}
+
+@layer base {
+  :root {
+    --bg-app: #fbfaf7;
+    --bg-sidebar: #f7f5f0;
+    --bg-card: #ffffff;
+    --border-main: #e6e4de;
+    --text-primary: #191919;
+    --text-muted: #7c7870;
+    --accent: #cc5e42;
+    --accent-hover: #b84f35;
+    --accent-light: rgba(204, 94, 66, 0.08);
+    --bubble-own: #cc5e42;
+    --bubble-own-text: #ffffff;
+    --bubble-other: #f0ece3;
+    --bubble-other-text: #191919;
+    --scrollbar-thumb: #d0cbc2;
+    
+    font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  [data-theme="dark"] {
+    --bg-app: #181816;
+    --bg-sidebar: #1e1e1c;
+    --bg-card: #222220;
+    --border-main: #2e2e2b;
+    --text-primary: #e6e5e0;
+    --text-muted: #9c9a94;
+    --accent: #cc5e42;
+    --accent-hover: #dd7156;
+    --accent-light: rgba(204, 94, 66, 0.15);
+    --bubble-own: #cc5e42;
+    --bubble-own-text: #ffffff;
+    --bubble-other: #2a2a27;
+    --bubble-other-text: #e6e5e0;
+    --scrollbar-thumb: #3e3e3b;
+  }
+
+  * {
+    box-sizing: border-box;
+    border-color: var(--border-main);
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg-app);
+    color: var(--text-primary);
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+    opacity: 0.8;
+  }
+}
+
+@layer utilities {
+  /* ── Fade-in (messages, emoji picker, reply bar) ── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0);   }
+  }
+  .animate-fadeIn {
+    animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* ── Message highlight pulse ── */
+  @keyframes highlightPulse {
+    0%   { background-color: var(--accent-light); }
+    100% { background-color: transparent; }
+  }
+  .highlight-pulse {
+    animation: highlightPulse 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ── Modal backdrop ── */
+  @keyframes backdropFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes backdropFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+  .animate-backdrop-in  { animation: backdropFadeIn  0.15s ease-out forwards; }
+  .animate-backdrop-out { animation: backdropFadeOut 0.12s ease-in  forwards; }
+
+  /* ── Modal dialog card ── */
+  @keyframes dialogScaleIn {
+    from { opacity: 0; transform: scale(0.96) translateY(8px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0);    }
+  }
+  @keyframes dialogScaleOut {
+    from { opacity: 1; transform: scale(1)    translateY(0);    }
+    to   { opacity: 0; transform: scale(0.97) translateY(4px);  }
+  }
+
+  .animate-dialog-in  { animation: dialogScaleIn  0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .animate-dialog-out { animation: dialogScaleOut 0.12s ease-in  forwards; }
+
+  /* ── Typing dots (fixed pixel size Tailwind can't express) ── */
+  .typing-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 9999px;
+    background: currentColor;
+    display: inline-block;
+  }
+
+  /* ── Input shake (empty-name submit) ── */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15%       { transform: translateX(-5px); }
+    45%       { transform: translateX(5px); }
+    75%       { transform: translateX(-3px); }
+  }
+}
